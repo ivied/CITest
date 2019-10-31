@@ -1,0 +1,46 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/code
+    docker:
+      - image: circleci/android:api-28
+    environment:
+      JVM_OPTS: -Xmx3200m
+    steps:
+      - checkout
+      - run: echo "Build process is started 👯"
+      - run: echo $RELEASE_KEYSTORE_BASE64
+      - run: echo $RELEASE_KEYSTORE_BASE64 | base64 --decode >> ${HOME}/repo/keystore.jks
+      - run: echo 'export KEYSTORE=${HOME}/repo/keystore.jks' >> $BASH_ENV
+      - restore_cache:
+          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "app/build.gradle" }}
+      #      - run:
+      #         name: Chmod permissions #if permission for Gradlew Dependencies fail, use this.
+      #         command: sudo chmod +x ./gradlew
+      - run:
+          name: Download Dependencies
+          command: ./gradlew androidDependencies
+      - save_cache:
+          paths:
+            - ~/.gradle
+          key: jars-{{ checksum "build.gradle" }}-{{ checksum  "app/build.gradle" }}
+
+      - run:
+          name: Run check
+          command: ./gradlew check --console=plain
+
+      - store_artifacts:
+          path: app/build/reports/
+          destination: reports/
+
+
+      - run:
+          name: Initial build
+          command: ./gradlew clean assembleRelease --no-daemon --stacktrace
+
+      - store_artifacts:
+          path: app/build/outputs/
+          destination: outputs/
+
+
+      # See https://circleci.com/docs/2.0/deployment-integrations/ for deploy examples
